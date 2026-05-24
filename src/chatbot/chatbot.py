@@ -157,6 +157,7 @@ class ParkingChatbot:
         self.rag_chain = RAGChain(
             vector_store=self.vector_store,
             sql_store=self.sql_store,
+            skip_vector_store=skip_vector_store,  # propagate flag to avoid re-creating VS
         )
 
         # Initialize guardrails (data protection)

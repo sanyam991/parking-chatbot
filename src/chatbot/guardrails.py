@@ -92,18 +92,12 @@ class Guardrails:
         self.enabled = settings.guardrails_enabled
         self.confidence_threshold = settings.pii_confidence_threshold
 
-        # Try to load Presidio (NLP-based PII detection)
+        # Presidio engines are loaded lazily on first filter_output() call
+        # to avoid blocking startup with spaCy model loading (~30-60s).
         self.presidio_available = False
-        try:
-            from presidio_analyzer import AnalyzerEngine
-            from presidio_anonymizer import AnonymizerEngine
-
-            self.analyzer = AnalyzerEngine()
-            self.anonymizer = AnonymizerEngine()
-            self.presidio_available = True
-            print("✓ Presidio PII analyzer loaded successfully.")
-        except (ImportError, Exception) as e:
-            print(f"⚠ Presidio not available, using regex fallback. Reason: {e}")
+        self._presidio_initialized = False
+        self.analyzer = None
+        self.anonymizer = None
 
         # Keywords that suggest a prompt injection attempt
         self.injection_patterns = [
@@ -143,6 +137,26 @@ class Guardrails:
         self.safe_patterns = [
             r"[A-Za-z0-9]{1,2}\*{2,}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",  # sa****@gmail.com
         ]
+
+    # -----------------------------------------------------------------------
+    # Lazy Presidio initialisation
+    # -----------------------------------------------------------------------
+
+    def _ensure_presidio(self):
+        """Load Presidio engines on first use (avoids blocking startup)."""
+        if self._presidio_initialized:
+            return
+        self._presidio_initialized = True
+        try:
+            from presidio_analyzer import AnalyzerEngine
+            from presidio_anonymizer import AnonymizerEngine
+
+            self.analyzer = AnalyzerEngine()
+            self.anonymizer = AnonymizerEngine()
+            self.presidio_available = True
+            print("✓ Presidio PII analyzer loaded successfully.")
+        except (ImportError, Exception) as e:
+            print(f"⚠ Presidio not available, using regex fallback. Reason: {e}")
 
     # -----------------------------------------------------------------------
     # Public-info protection helpers (placeholder substitution)
@@ -257,6 +271,9 @@ class Guardrails:
         """
         if not self.enabled:
             return response
+
+        # Lazy-load Presidio on first real use (spaCy model can take 30-60s).
+        self._ensure_presidio()
 
         response = str(response) if not isinstance(response, str) else response
 
