@@ -344,13 +344,13 @@ def _init_pipeline_background() -> None:
         # Vector store will be injected later via RAGChain.set_vector_store().
         _log.info("[PIPELINE] RAG INIT START (SQL-only mode — vector store loads lazily after ready)")
         from src.chatbot.rag_chain import RAGChain  # noqa: PLC0415
-        _rag = RAGChain(vector_store=None, sql_store=_sql)
+        _rag = RAGChain(sql_store=_sql, skip_vector_store=True)
         _log.info("[PIPELINE] RAG DONE")
 
         # ── Stage 3: Chatbot ─────────────────────────────────────────────────
         _log.info("[PIPELINE] CHATBOT INIT START")
         from src.chatbot.chatbot import ParkingChatbot  # noqa: PLC0415
-        _bot = ParkingChatbot(vector_store=None)
+        _bot = ParkingChatbot(skip_vector_store=True)
         _bot.sql_store = _sql
         _bot.rag_chain = _rag
         _log.info("[PIPELINE] CHATBOT INIT DONE")

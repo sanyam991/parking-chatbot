@@ -162,13 +162,17 @@ class RAGChain:
     (important for the reservation flow where we collect info step by step).
     """
 
-    def __init__(self, vector_store: VectorStore = None, sql_store: SQLStore = None):
+    def __init__(self, vector_store: VectorStore = None, sql_store: SQLStore = None,
+                 skip_vector_store: bool = False):
         """
         Initialize the RAG chain with all components.
 
         Args:
-            vector_store: Pre-initialized VectorStore (or creates new one)
-            sql_store: Pre-initialized SQLStore (or creates new one)
+            vector_store: Pre-initialized VectorStore to use directly.
+            sql_store: Pre-initialized SQLStore (or creates new one).
+            skip_vector_store: If True, start in SQL-only mode without creating
+                or waiting for a VectorStore. Use set_vector_store() later to
+                upgrade once the VS loads in the background.
         """
         import concurrent.futures
         import logging as _logging
@@ -177,13 +181,17 @@ class RAGChain:
         # Initialize SQL store
         self.sql_store = sql_store or SQLStore()
 
-        # Try to initialize Pinecone VectorStore with a 25s timeout.
-        # If it hangs or fails (e.g. on Render cold-start), fall back to
-        # SQL-only mode so the chatbot still works for pricing/availability.
-        self.vector_store = None
-        if vector_store:
+        # Resolve vector store.
+        # skip_vector_store=True  → SQL-only mode, VS injected later via set_vector_store()
+        # vector_store is provided → use it directly (already built)
+        # neither               → auto-create with 25s timeout (original behaviour)
+        if skip_vector_store:
+            self.vector_store = None
+            _log.info("RAGChain in SQL-only mode (vector store will load lazily)")
+        elif vector_store:
             self.vector_store = vector_store
         else:
+            self.vector_store = None
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
                     _future = _pool.submit(VectorStore)

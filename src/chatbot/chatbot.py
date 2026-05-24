@@ -121,15 +121,18 @@ class ParkingChatbot:
         reservation_data: "ReservationData" = field(default_factory=lambda: ReservationData())
         chat_history: list = field(default_factory=list)
 
-    def __init__(self, vector_store: "VectorStore | None" = None):
+    def __init__(self, vector_store: "VectorStore | None" = None,
+                 skip_vector_store: bool = False):
         """Initialize all components of the chatbot."""
         import logging as _lg
         _log = _lg.getLogger(__name__)
 
-        # If a pre-built VectorStore is provided (from the pipeline init thread),
-        # use it directly. Otherwise attempt to build one, falling back to None
-        # (SQL-only mode) on any failure so the chatbot still starts.
-        if vector_store is not None:
+        # skip_vector_store=True  → SQL-only mode (VS injected later)
+        # vector_store provided   → use it directly
+        # neither                 → auto-create with 30s timeout
+        if skip_vector_store:
+            self.vector_store = None
+        elif vector_store is not None:
             self.vector_store = vector_store
         else:
             import concurrent.futures as _cf
